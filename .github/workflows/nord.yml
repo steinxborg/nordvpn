@@ -1,0 +1,38 @@
+name: Update nordvpn proxy list
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Download and combine NordVPN proxy servers
+        run: |
+          mkdir -p proxy
+          declare -a countrycode=("au" "ca" "fr" "de" "hk" "in" "jp" "nl" "sg" "se" "ch" "tw" "uk" "us")
+          declare -a countryid=("13" "38" "74" "81" "97" "100" "108" "153" "195" "208" "209" "211" "227" "228")
+
+          > proxy/nordvpn.txt  # Clear or create combined file
+
+          for (( i=0; i<${#countrycode[@]}; i++ ));
+          do
+            echo "Fetching proxies for ${countrycode[$i]}..."
+            curl --silent "https://api.nordvpn.com/v1/servers/recommendations?filters\[country_id\]=${countryid[$i]}&filters\[servers_technologies\]\[identifier\]=proxy_ssl&limit=100" \
+              | jq --raw-output '.[].hostname' >> proxy/nordvpn.txt
+          done
+
+          # Optional: remove duplicates and format each line
+          sort -u proxy/nordvpn.txt -o proxy/nordvpn.txt
+
+      - name: Commit and push changes
+        uses: actions-js/push@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
+          message: "Automatically updated NordVPN proxy list"
